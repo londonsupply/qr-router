@@ -1,10 +1,12 @@
+import type { NextRequest } from 'next/server';
+
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 const MAP: Record<string, string> = {
   landing: 'https://destino-actual.com',
   catalogo: 'https://mi-sitio.com/catalogo',
-  whatsapp: 'https://wa.me/5491112345678'
+  whatsapp: 'https://wa.me/5491112345678',
 };
 
 function withUTM(url: string, slug: string) {
@@ -15,8 +17,18 @@ function withUTM(url: string, slug: string) {
   return u.toString();
 }
 
-export async function GET(req: Request, { params }: { params: { slug: string } }) {
-  const slug = params?.slug ?? 'landing';
+// Compatible Next 14/15: params puede venir como objeto o como Promise
+export async function GET(
+  req: NextRequest,
+  ctx:
+    | { params: { slug: string } }
+    | { params: Promise<{ slug: string }> }
+    | any
+) {
+  const p: any = ctx?.params;
+  const slug: string =
+    typeof p?.then === 'function' ? (await p).slug : p?.slug ?? 'landing';
+
   const raw = MAP[slug] ?? MAP['landing'] ?? 'https://mi-sitio.com';
   const dest = withUTM(raw, slug);
 
@@ -34,11 +46,16 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         ts: new Date().toISOString(),
-        slug, dest: raw,
+        slug,
+        dest: raw,
         ip_truncated: ip.replace(/\.\d+$/, '.0'),
-        ua, ref, country, region, city
+        ua,
+        ref,
+        country,
+        region,
+        city,
       }),
-      keepalive: true
+      keepalive: true,
     }).catch(() => {});
   }
 
@@ -47,7 +64,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     headers: {
       Location: dest,
       'Cache-Control': 'no-store, no-cache, max-age=0',
-      'Referrer-Policy': 'no-referrer'
-    }
+      'Referrer-Policy': 'no-referrer',
+    },
   });
 }
