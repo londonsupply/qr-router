@@ -17,27 +17,21 @@ function withUTM(url: string, slug: string) {
   return u.toString();
 }
 
-// Compatible Next 14/15: params puede venir como objeto o como Promise
 export async function GET(
-  req: NextRequest,
-  ctx:
-    | { params: { slug: string } }
-    | { params: Promise<{ slug: string }> }
-    | any
+  request: NextRequest,
+  context: { params: Promise<{ slug: string }> } // 👈 Next 15 espera Promise aquí
 ) {
-  const p: any = ctx?.params;
-  const slug: string =
-    typeof p?.then === 'function' ? (await p).slug : p?.slug ?? 'landing';
+  const { slug } = await context.params;
 
   const raw = MAP[slug] ?? MAP['landing'] ?? 'https://mi-sitio.com';
   const dest = withUTM(raw, slug);
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
-  const ua = req.headers.get('user-agent') ?? '';
-  const ref = req.headers.get('referer') ?? '';
-  const country = req.headers.get('x-vercel-ip-country') ?? '';
-  const region = req.headers.get('x-vercel-ip-country-region') ?? '';
-  const city = req.headers.get('x-vercel-ip-city') ?? '';
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
+  const ua = request.headers.get('user-agent') ?? '';
+  const ref = request.headers.get('referer') ?? '';
+  const country = request.headers.get('x-vercel-ip-country') ?? '';
+  const region = request.headers.get('x-vercel-ip-country-region') ?? '';
+  const city = request.headers.get('x-vercel-ip-city') ?? '';
 
   const webhook = process.env.N8N_WEBHOOK_URL;
   if (webhook) {
@@ -49,11 +43,7 @@ export async function GET(
         slug,
         dest: raw,
         ip_truncated: ip.replace(/\.\d+$/, '.0'),
-        ua,
-        ref,
-        country,
-        region,
-        city,
+        ua, ref, country, region, city,
       }),
       keepalive: true,
     }).catch(() => {});
