@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 const MAP: Record<string, string> = {
   landing: 'https://www.registroslondonsupply.com',
-  catalogo: 'https://mi-sitio.com/catalogo',
+  catalogo: 'https://www.registroslondonsupply.com',
   whatsapp: 'https://wa.me/5491112345678',
 };
 
