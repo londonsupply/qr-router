@@ -4,7 +4,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 const MAP: Record<string, string> = {
-  landing: 'https://www.registroslondon.com',
+  landing: 'https://destino-actual.com',
   catalogo: 'https://mi-sitio.com/catalogo',
   whatsapp: 'https://wa.me/5491112345678',
 };
@@ -17,42 +17,57 @@ function withUTM(url: string, slug: string) {
   return u.toString();
 }
 
-async function resolveParams(context: { params: Promise<{ slug: string }> }) {
-  const { slug } = await context.params;           // Next 15 entrega Promise
+type ParamCtx = { params: Promise<{ slug: string }> };
+type Resolved = { slug: string; raw: string; dest: string };
+type LogPayload = Record<string, unknown>; // 👈 en vez de "any"
+
+async function resolveParams(ctx: ParamCtx): Promise<Resolved> {
+  const { slug } = await ctx.params; // Next 15 entrega Promise
   const key = slug || 'landing';
   const raw = MAP[key] ?? MAP['landing'] ?? 'https://mi-sitio.com';
   const dest = withUTM(raw, key);
   return { slug: key, raw, dest };
 }
 
-async function sendLog(req: NextRequest, payload: any) {
+async function sendLog(req: NextRequest, payload: LogPayload): Promise<void> {
   const webhook = process.env.N8N_WEBHOOK_URL;
   if (!webhook) return;
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
   const ua = req.headers.get('user-agent') ?? '';
   const ref = req.headers.get('referer') ?? '';
   const country = req.headers.get('x-vercel-ip-country') ?? '';
   const region = req.headers.get('x-vercel-ip-country-region') ?? '';
   const city = req.headers.get('x-vercel-ip-city') ?? '';
+
   fetch(webhook, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       ts: new Date().toISOString(),
       ip_truncated: ip.includes(':') ? ip : ip.replace(/\.\d+$/, '.0'),
-      ua, ref, country, region, city, ...payload
+      ua, ref, country, region, city,
+      ...payload,
     }),
-    keepalive: true
+    keepalive: true,
   }).catch(() => {});
 }
 
-export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, ctx: ParamCtx) {
   const { slug, raw, dest } = await resolveParams(ctx);
-  sendLog(req, { slug, dest: raw }); // no bloquea
-  return new Response(null, { status: 302, headers: { Location: dest, 'Cache-Control': 'no-store, no-cache, max-age=0', 'Referrer-Policy': 'no-referrer' } });
+  // log no bloqueante
+  sendLog(req, { slug, dest: raw });
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: dest,
+      'Cache-Control': 'no-store, no-cache, max-age=0',
+      'Referrer-Policy': 'no-referrer',
+    },
+  });
 }
 
-export async function HEAD(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+export async function HEAD(_req: NextRequest, ctx: ParamCtx) {
   const { dest } = await resolveParams(ctx);
   return new Response(null, { status: 302, headers: { Location: dest } });
 }
