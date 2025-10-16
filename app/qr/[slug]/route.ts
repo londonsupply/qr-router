@@ -4,9 +4,9 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 const MAP: Record<string, string> = {
-  landing: 'https://www.registroslondonsupply.com',
-  catalogo: 'https://mi-sitio.com/catalogo',
-  whatsapp: 'https://wa.me/5491112345678',
+  landing:  'https://www.registroslondonsupply.com',            // <-- tus URLs reales
+  catalogo: 'https://www.registroslondonsupply.com/catalogo',
+  whatsapp: 'https://wa.me/54911XXXXXXXX',
 };
 
 function withUTM(url: string, slug: string) {
@@ -19,12 +19,12 @@ function withUTM(url: string, slug: string) {
 
 type ParamCtx = { params: Promise<{ slug: string }> };
 type Resolved = { slug: string; raw: string; dest: string };
-type LogPayload = Record<string, unknown>; // 👈 en vez de "any"
+type LogPayload = Record<string, unknown>;
 
 async function resolveParams(ctx: ParamCtx): Promise<Resolved> {
-  const { slug } = await ctx.params; // Next 15 entrega Promise
+  const { slug } = await ctx.params;                // Next 15 entrega Promise
   const key = slug || 'landing';
-  const raw = MAP[key] ?? MAP['landing'] ?? 'https://mi-sitio.com';
+  const raw = MAP[key] ?? MAP['landing'] ?? 'https://tu-dominio.com';
   const dest = withUTM(raw, key);
   return { slug: key, raw, dest };
 }
@@ -55,8 +55,7 @@ async function sendLog(req: NextRequest, payload: LogPayload): Promise<void> {
 
 export async function GET(req: NextRequest, ctx: ParamCtx) {
   const { slug, raw, dest } = await resolveParams(ctx);
-  // log no bloqueante
-  sendLog(req, { slug, dest: raw });
+  sendLog(req, { slug, dest: raw }); // no bloquea
   return new Response(null, {
     status: 302,
     headers: {
