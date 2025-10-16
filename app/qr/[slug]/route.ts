@@ -4,7 +4,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 const MAP: Record<string, string> = {
-  landing: 'https://destino-actual.com',
+  landing: 'https://www.registroslondon.com',
   catalogo: 'https://mi-sitio.com/catalogo',
   whatsapp: 'https://wa.me/5491112345678',
 };
