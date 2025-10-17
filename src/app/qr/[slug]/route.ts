@@ -26,29 +26,59 @@ async function resolveParams(ctx: ParamCtx) {
   return { slug: key, raw, dest: withUTM(raw, key) };
 }
 
-async function sendLog(req: NextRequest, payload: LogPayload) {
-  const webhook = process.env.N8N_WEBHOOK_URL; if (!webhook) return;
+async function sendLog(req: NextRequest, payload: LogPayload): Promise<void> {
+  const webhook = process.env.N8N_WEBHOOK_URL;
+  if (!webhook) return;
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
   const ua = req.headers.get('user-agent') ?? '';
   const ref = req.headers.get('referer') ?? '';
   const country = req.headers.get('x-vercel-ip-country') ?? '';
   const region = req.headers.get('x-vercel-ip-country-region') ?? '';
   const city = req.headers.get('x-vercel-ip-city') ?? '';
-  fetch(webhook, { method:'POST', headers:{'content-type':'application/json'},
-    body: JSON.stringify({ ts:new Date().toISOString(),
-      ip_truncated: ip.includes(':') ? ip : ip.replace(/\.\d+$/, '.0'),
-      ua, ref, country, region, city, ...payload }),
-    keepalive: true }).catch(() => {});
+
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort('timeout'), 400); // máx 400ms de espera
+
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ts: new Date().toISOString(),
+        ip_truncated: ip.includes(':') ? ip : ip.replace(/\.\d+$/, '.0'),
+        ua, ref, country, region, city,
+        ...payload,
+      }),
+      keepalive: true,
+      signal: ac.signal,
+    });
+  } catch {
+    // silencioso: no bloquea el redirect
+  } finally {
+    clearTimeout(t);
+  }
 }
+
 
 export async function GET(req: NextRequest, ctx: ParamCtx) {
   const { slug, raw, dest } = await resolveParams(ctx);
-  sendLog(req, { slug, dest: raw });
-  return new Response(null, { status: 302, headers: {
-    Location: dest, 'Cache-Control':'no-store, no-cache, max-age=0', 'Referrer-Policy':'no-referrer' }});
+  // Espera el log (hasta 400ms) para que no se pierda al redirigir
+  await sendLog(req, { slug, dest: raw, method: 'GET' });
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: dest,
+      'Cache-Control': 'no-store, no-cache, max-age=0',
+      'Referrer-Policy': 'no-referrer',
+    },
+  });
 }
 
-export async function HEAD(_req: NextRequest, ctx: ParamCtx) {
-  const { dest } = await resolveParams(ctx);
+export async function HEAD(req: NextRequest, ctx: ParamCtx) {
+  const { slug, raw, dest } = await resolveParams(ctx);
+  await sendLog(req, { slug, dest: raw, method: 'HEAD' });
   return new Response(null, { status: 302, headers: { Location: dest } });
+}
+
 }
