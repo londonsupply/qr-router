@@ -81,4 +81,4 @@ export async function HEAD(req: NextRequest, ctx: ParamCtx) {
   return new Response(null, { status: 302, headers: { Location: dest } });
 }
 
-}
+
