@@ -10,10 +10,10 @@
     "make:qr": "node scripts/make-qr.mjs",
     "make:qr:prod": "node scripts/make-qr.mjs https://www.registroslondonsupply.online landing,catalogo,whatsapp qr-codes",
     "make-qr:prod": "npm run make:qr:prod"
-    
   },
   "dependencies": {
     "next": "15.5.5",
+    "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0"
@@ -21,6 +21,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
