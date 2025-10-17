@@ -6,20 +6,25 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "make:qr": "node scripts/make-qr.mjs",
+    "make:qr:prod": "node scripts/make-qr.mjs https://www.registroslondonsupply.online landing,catalogo,whatsapp qr-codes",
+    "make-qr:prod": "npm run make:qr:prod"
+    
   },
   "dependencies": {
+    "next": "15.5.5",
+    "qrcode": "^1.5.4",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.5.5"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.5",
-    "@eslint/eslintrc": "^3"
+    "typescript": "^5"
   }
 }
