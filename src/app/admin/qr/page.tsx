@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type Row = { dia: string; slug: string; escaneos: number; unicos: number };
 
@@ -10,7 +10,7 @@ export default function QrStatsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -18,31 +18,28 @@ export default function QrStatsPage() {
       p.set('days', String(days));
       if (slug.trim()) p.set('slug', slug.trim());
       const res = await fetch(`/api/qr/stats?${p.toString()}`, { cache: 'no-store' });
-      const data = await res.json();
+      const data: { ok: boolean; rows?: Row[]; error?: string } = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || res.statusText);
-      setRows((data.rows || []) as Row[]);
-    } catch (e: any) {
-      setError(String(e.message || e));
+      setRows(data.rows ?? []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }
+  }, [days, slug]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  const totals = useMemo(() => {
-    return rows.reduce((acc, r) => {
-      acc.escaneos += r.escaneos;
-      acc.unicos += r.unicos;
-      return acc;
-    }, { escaneos: 0, unicos: 0 });
-  }, [rows]);
+  const totals = useMemo(
+    () => rows.reduce((a, r) => ({ escaneos: a.escaneos + r.escaneos, unicos: a.unicos + r.unicos }),
+                      { escaneos: 0, unicos: 0 }),
+    [rows]
+  );
 
   function downloadCSV() {
     const header = 'dia,slug,escaneos,unicos';
     const lines = rows.map(r => `${r.dia},${r.slug},${r.escaneos},${r.unicos}`);
-    const csv = [header, ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([header + '\n' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
