@@ -10,50 +10,69 @@ function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === 'object' && v !== null;
 }
 
-function isRow(v: unknown): v is Row {
-  if (!isRecord(v)) return false;
-  return (
-    typeof v.dia === 'string' &&
-    typeof v.slug === 'string' &&
-    typeof v.escaneos === 'number' &&
-    typeof v.unicos === 'number'
-  );
+function toNumber(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function toRow(v: unknown): Row | null {
+  // Soporta { json: {...} } o fila directa
+  const o: UnknownRecord | null = isRecord(v)
+    ? (isRecord((v as UnknownRecord).json) ? ((v as UnknownRecord).json as UnknownRecord) : (v as UnknownRecord))
+    : null;
+  if (!o) return null;
+
+  const dia = o.dia;
+  const slug = o.slug;
+  const esc = toNumber(o.escaneos);
+  const uni = toNumber(o.unicos);
+
+  if (typeof dia === 'string' && typeof slug === 'string' && esc !== null && uni !== null) {
+    return { dia, slug, escaneos: esc, unicos: uni };
+  }
+  return null;
 }
 
 function getRowsFromRowsField(v: unknown): Row[] | null {
   if (!isRecord(v)) return null;
-  const rows = v['rows'];
-  if (Array.isArray(rows) && rows.every(isRow)) return rows as Row[];
+  const rowsField = v.rows;
+  if (Array.isArray(rowsField)) {
+    const out: Row[] = [];
+    for (const it of rowsField as unknown[]) {
+      const r = toRow(it);
+      if (r) out.push(r);
+    }
+    return out;
+  }
   return null;
 }
 
 function normalize(raw: unknown): Row[] {
-  // A) Array de filas directas
-  if (Array.isArray(raw) && raw.every(isRow)) return raw as Row[];
-
-  // B) Array de { json: Row }
+  // A) Array de filas (directas o {json:{...}}), o bien [{ rows: [...] }]
   if (Array.isArray(raw)) {
-    const collected: Row[] = [];
-    for (const item of raw) {
-      if (isRecord(item)) {
-        const jsonVal = (item as UnknownRecord)['json'];
-        if (isRow(jsonVal)) collected.push(jsonVal);
-      }
+    const out: Row[] = [];
+    // Caso [{ rows: [...] }]
+    const firstRows = getRowsFromRowsField(raw[0]);
+    if (firstRows) return firstRows;
+
+    for (const it of raw) {
+      const r = toRow(it);
+      if (r) out.push(r);
     }
-    if (collected.length) return collected;
-
-    // C) Array cuyo primer elemento tiene { rows: Row[] }
-    const fromFirst = getRowsFromRowsField(raw[0]);
-    if (fromFirst) return fromFirst;
-
-    return [];
+    return out;
   }
 
-  // D) Objeto con { rows: Row[] }
-  const fromObj = getRowsFromRowsField(raw);
-  if (fromObj) return fromObj;
+  // B) Objeto con { rows: [...] }
+  const rowsFromObj = getRowsFromRowsField(raw);
+  if (rowsFromObj) return rowsFromObj;
 
-  return [];
+  // C) Fila suelta
+  const single = toRow(raw);
+  return single ? [single] : [];
 }
 
 export async function GET(req: Request): Promise<Response> {
@@ -62,12 +81,14 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ ok: false, error: 'N8N_STATS_URL missing' }, { status: 500 });
   }
 
-  const token = process.env.N8N_STATS_TOKEN ?? '';
-  const search = new URL(req.url).search;
+  const token = (process.env.N8N_STATS_TOKEN ?? '').trim();
+  const headers = new Headers();
+  if (token) headers.set('x-qr-token', token);
 
-  const headers: HeadersInit | undefined = token ? { 'x-qr-token': token } : undefined;
+  const search = new URL(req.url).search; // ?days=&slug=
   const r = await fetch(`${base}${search}`, { headers, cache: 'no-store' });
 
+  // Parseo seguro del body
   let raw: unknown = null;
   try {
     const ct = r.headers.get('content-type') ?? '';
