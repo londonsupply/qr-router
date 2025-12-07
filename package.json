@@ -12,7 +12,7 @@
     "make-qr:prod": "npm run make:qr:prod"
   },
   "dependencies": {
-    "next": "15.5.5",
+    "next": "15.5.7",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
@@ -25,7 +25,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.5",
+    "eslint-config-next": "15.5.7",
     "typescript": "^5"
   }
 }
